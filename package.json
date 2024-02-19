@@ -8,6 +8,7 @@
   },
   "author": "JGGrande",
   "license": "ISC",
+  "type": "module",
   "dependencies": {
     "body-parser": "^1.20.2",
     "connect-timeout": "^1.9.0",
