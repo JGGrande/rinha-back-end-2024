@@ -1,10 +1,8 @@
-import { number, object, string } from "yup";
 
 export class Cliente {
 
-    constructor({ id, nome, saldoInicial, limite  }) {    
+    constructor({ id, saldoInicial, limite  }) {    
         this.id = id;
-        this.nome = nome;
         this.saldoInicial = saldoInicial;
         this.limite = limite;
     }
@@ -19,7 +17,6 @@ export class Cliente {
         }
 
         const dadosInserir = {
-            nome: this.nome,
             saldoInicial: this.saldoInicial,
             limite: this.limite
         };
@@ -42,12 +39,10 @@ export class Cliente {
             return null;
         }
 
-        const { nome, saldoInicial, limite } = dados;
+        const { saldoInicial, limite } = dados;
 
-        this.nome = nome;
         this.saldoInicial = saldoInicial;
         this.limite = limite;
-
     }
 
 }

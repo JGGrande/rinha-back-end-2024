@@ -4,6 +4,7 @@ import { Cliente } from "./src/model/Cliente.js";
 import { ValidationError, number, object, string } from "yup";
 import { validarCorpoRequestMiddleware } from "./src/middleware/validarCorpoRequisicao.js";
 import bodyParser from "body-parser";
+import { TipoTransacoes } from "./src/model/TipoTransacoes.js";
 
 const repositorioEmMemoria = {
   clientes: [],
@@ -85,6 +86,46 @@ app.get('/:id/transacoes', async ( request, respose ) => {
 
 
 });
+
+const criarTransacaoCorpoSchema = object().shape({
+  valor: number().positive().required(),
+  tipo : string().oneOf([ TipoTransacoes.credito,TipoTransacoes.debito ]).required(),
+  descricao : string().min(1).max(10).required()
+});
+
+app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransacaoCorpoSchema), ( request, response ) => {
+  const id = parseInt(request.params.id); 
+
+  if(!id || isNaN(id) || id < 1 ) {
+    return response.sendStatus(400)
+  }
+
+  const { valor, tipo, descricao } = request.body;
+
+  const cliente = new Cliente({ id });
+
+  if(!cliente){
+    return response.sendStatus(404)
+  }
+
+  if(tipo === TipoTransacoes.credito){
+    cliente.limite -= valor;
+  }
+
+  if(tipo === TipoTransacoes.debito){  
+    cliente.saldoInicial -= valor;
+  }
+
+  if(tipo === TipoTransacoes.debito && cliente.saldoInicial < cliente.limite){
+    return response.sendStatus(422)
+  }
+
+  return response.status(200).json({
+    limite: cliente.limite,
+    saldo: cliente.saldoInicial
+  });
+});
+
 
 const criarClienteEsquema = object().shape({
   nome: string().max(255).required(),
