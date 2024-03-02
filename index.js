@@ -93,7 +93,7 @@ const criarTransacaoCorpoSchema = object().shape({
   descricao : string().min(1).max(10).required()
 });
 
-app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransacaoCorpoSchema), ( request, response ) => {
+app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransacaoCorpoSchema), async ( request, response ) => {
   const id = parseInt(request.params.id); 
 
   if(!id || isNaN(id) || id < 1 ) {
@@ -103,6 +103,8 @@ app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransaca
   const { valor, tipo, descricao } = request.body;
 
   const cliente = new Cliente({ id });
+
+  await cliente.encontrarPorId();
 
   if(!cliente){
     return response.sendStatus(404)
