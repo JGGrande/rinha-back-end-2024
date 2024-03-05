@@ -5,6 +5,7 @@ import { ValidationError, number, object, string } from "yup";
 import { validarCorpoRequestMiddleware } from "./src/middleware/validarCorpoRequisicao.js";
 import bodyParser from "body-parser";
 import { TipoTransacoes } from "./src/model/TipoTransacoes.js";
+import { Transacao } from "./src/model/Transacao.js";
 
 const repositorioEmMemoria = {
   clientes: [],
@@ -12,18 +13,18 @@ const repositorioEmMemoria = {
 
     if(id){
       const cliente = this.clientes.find( cliente => cliente.id === id );
-      
+
       if(!cliente){
         return null
       }
-      
+
       return cliente
     }
 
-    const dadosParInserir = { 
+    const dadosParInserir = {
       id: this.clientes.length + 1,
-      nome, 
-      saldoInicial, 
+      nome,
+      saldoInicial,
       limite
     }
 
@@ -94,7 +95,7 @@ const criarTransacaoCorpoSchema = object().shape({
 });
 
 app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransacaoCorpoSchema), async ( request, response ) => {
-  const id = parseInt(request.params.id); 
+  const id = parseInt(request.params.id);
 
   if(!id || isNaN(id) || id < 1 ) {
     return response.sendStatus(400)
@@ -103,6 +104,10 @@ app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransaca
   const { valor, tipo, descricao } = request.body;
 
   const cliente = new Cliente({ id });
+
+  const transacao = new Transacao({ valor, tipo, descricao });
+
+  cliente.conectar(repositorioEmMemoria);
 
   await cliente.encontrarPorId();
 
@@ -114,13 +119,17 @@ app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransaca
     cliente.limite -= valor;
   }
 
-  if(tipo === TipoTransacoes.debito){  
+  if(tipo === TipoTransacoes.debito){
     cliente.saldoInicial -= valor;
   }
 
   if(tipo === TipoTransacoes.debito && cliente.saldoInicial < cliente.limite){
     return response.sendStatus(422)
   }
+
+  transacao.conectar(repositorioEmMemoria);
+
+  await transacao.salvar();
 
   return response.status(200).json({
     limite: cliente.limite,
