@@ -1,11 +1,12 @@
 import express from "express";
-// import { pool } from "./src/database/connection.js";
+import { pool } from "./src/database/connection.js";
 import { Cliente } from "./src/model/Cliente.js";
 import { ValidationError, number, object, string } from "yup";
 import { validarCorpoRequestMiddleware } from "./src/middleware/validarCorpoRequisicao.js";
 import bodyParser from "body-parser";
 import { TipoTransacoes } from "./src/model/TipoTransacoes.js";
 import { Transacao } from "./src/model/Transacao.js";
+import { bootstrapDatabaseTables } from "./src/database/migration.js";
 
 const repositorioEmMemoria = {
   clientes: [],
@@ -103,33 +104,51 @@ app.post("/clientes/:id/transacoes", validarCorpoRequestMiddleware(criarTransaca
 
   const { valor, tipo, descricao } = request.body;
 
-  const cliente = new Cliente({ id });
-
-  const transacao = new Transacao({ valor, tipo, descricao });
-
-  cliente.conectar(repositorioEmMemoria);
-
-  await cliente.encontrarPorId();
+  const queryResult = await pool.query(`
+    SELECT *
+    FROM pessoas
+    WHERE id = $id;
+  `, [ id ]);
+  
+  const [ cliente ] = queryResult.rows;
 
   if(!cliente){
     return response.sendStatus(404)
   }
 
-  if(tipo === TipoTransacoes.credito){
-    cliente.limite -= valor;
-  }
+  const transacaoQueryResults = await pool.query(`
+    SELECT *
+    FROM transacoes
+    WHERE 'pessoaId' = $id      
+  `, [ id ]);
 
-  if(tipo === TipoTransacoes.debito){
-    cliente.saldoInicial -= valor;
-  }
+  const transacoes = transacaoQueryResults.rows;
 
-  if(tipo === TipoTransacoes.debito && cliente.saldoInicial < cliente.limite){
+  const valorTransacoesNoCredito = transacoes.reduce(( valor, transacao) => {
+    if(transacao.tipo === TipoTransacoes.credito){
+      return valor += transacao.valor;
+    }
+    return valor;
+  }, valor);
+
+  const valorTransacoesNoDebito = transacoes.reduce(( valor, transacao) => {
+    if(transacao.tipo === TipoTransacoes.debito){
+      return valor += transacao.valor;
+    }
+    return valor;
+  }, valor);
+
+
+  if(tipo === TipoTransacoes.debito && (valorTransacoesNoDebito - valor) < cliente.limite){
     return response.sendStatus(422)
   }
 
-  transacao.conectar(repositorioEmMemoria);
-
-  await transacao.salvar();
+  await pool.query(`
+    INSERT INTO transacoes  
+    ( valor, tipo, descricao, pessoaId )
+    values 
+    ( $valor, $tipo, $descricao, $pessoaId );
+  `, [ valor, tipo, descricao, id ]);
 
   return response.status(200).json({
     limite: cliente.limite,
@@ -142,6 +161,29 @@ const criarClienteEsquema = object().shape({
   nome: string().max(255).required(),
   limite: number().moreThan(-1).required(),
   saldoInicial: number().moreThan(-1).required()
+});
+
+app.get('/clientes', async ( request, response ) => {
+
+  const queryResults = await pool.query(`
+    SELECT * 
+    FROM pessoas;
+  `)
+
+  const results = queryResults.rows;
+
+  return response.json(results)
+});
+
+app.get('/transacoes', async ( request, response ) => {
+  const queryResults = await pool.query(`
+    SELECT * 
+    FROM transacoes;
+  `)
+
+  const results = queryResults.rows;
+
+  return response.json(results)
 });
 
 
@@ -158,4 +200,7 @@ app.post('/clientes', validarCorpoRequestMiddleware(criarClienteEsquema), async 
   return respose.status(201).json({ id: cliente.id, nome, saldoInicial, limite });
 });
 
-app.listen(8080, () => console.log("server on 8080"))
+app.listen(8080, () => {
+  console.log("server on 8080")
+  console.log(pool)
+})

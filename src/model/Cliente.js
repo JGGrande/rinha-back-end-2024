@@ -7,7 +7,7 @@ export class Cliente {
         this.limite = limite;
     }
 
-    conectar(repositorio){
+    static conectar(repositorio){
         this.repositorio = repositorio;
     }
 
@@ -43,6 +43,21 @@ export class Cliente {
 
         this.saldoInicial = saldoInicial;
         this.limite = limite;
+    }
+
+    static async encontrarTodos(){
+        if(!this.repositorio){
+            throw new Error("Repositorio não econtrado");
+        }
+
+        const queryResults = this.repositorio.query(`
+            SELECT * 
+            FROM pessoas;
+        `)
+
+        const [ results ] = queryResults.rows;
+
+        console.log(results)
     }
 
 }
